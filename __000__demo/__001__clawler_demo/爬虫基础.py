@@ -7,7 +7,7 @@
 3. 处理响应（状态码、编码）
 4. 解析/保存数据
 
-依赖：pip install requests
+依赖：见项目根目录 requirements.txt（pip install -r requirements.txt）
 """
 import re
 from pathlib import Path
