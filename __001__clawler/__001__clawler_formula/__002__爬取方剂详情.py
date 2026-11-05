@@ -16,7 +16,9 @@
 
 特点：
     - 同一方剂可能出现在多个分类中，按名称去重，只爬一次
-    - 已经存在的 txt 会跳过，中断后重新运行即可断点续爬
+    - 通过 RESUME 参数选择模式：
+        True  断点续爬：已经存在的 txt 跳过，只爬还没爬的（中断后重新运行即可接着爬）
+        False 从头开始：所有方剂重新爬取，覆盖已有的 txt
     - 每次请求之间暂停一下，避免给网站造成压力
 
 依赖：见项目根目录 requirements.txt（pip install -r requirements.txt）
@@ -42,6 +44,7 @@ HEADERS = {
 }
 SLEEP_SECONDS = 1   # 每次请求后的等待时间（秒）
 RETRY_TIMES = 3     # 请求失败时的重试次数
+RESUME = True       # True：断点续爬，跳过已爬取的方剂；False：从头开始，全部重新爬取并覆盖
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -104,29 +107,43 @@ def save_txt(row: dict, text: str, path: Path) -> None:
         f"分类：{row['大类']} - {row['小类']}\n"
         f"链接：{row['链接']}\n"
     )
-    path.write_text(header + "\n" + text + "\n", encoding="utf-8")
+    # 先写临时文件，写完再改名：如果写到一半被中断，不会留下残缺的 txt，
+    # 避免断点续爬时把残缺文件当成「已爬取」而跳过
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_text(header + "\n" + text + "\n", encoding="utf-8")
+    tmp_path.replace(path)
 
 
-def main():
+def txt_path(row: dict) -> Path:
+    """方剂对应的 txt 保存路径"""
+    return SAVE_DIR / f"{safe_filename(row['名称'])}.txt"
+
+
+def main(resume: bool = RESUME):
     SAVE_DIR.mkdir(exist_ok=True)
     rows = read_csv(CSV_PATH)
+    total = len(rows)
 
-    success, skipped, failed = 0, 0, []
-    progress = tqdm(rows, desc="爬取方剂", unit="个")
+    if resume:
+        # 断点续爬：过滤掉已经有 txt 的方剂，只爬剩下的
+        rows = [row for row in rows if not txt_path(row).exists()]
+        print(f"断点续爬：共 {total} 个方剂，已爬取 {total - len(rows)} 个，本次需爬取 {len(rows)} 个")
+    else:
+        print(f"从头开始：共 {total} 个方剂，全部重新爬取（覆盖已有文件）")
+
+    success, failed = 0, []
+    # 进度条按全部方剂计算：total 是总数，initial 是已爬取的数量，
+    # 断点续爬时进度条直接从已完成的位置开始，而不是从 0 开始
+    progress = tqdm(rows, desc="爬取方剂", unit="个", total=total, initial=total - len(rows))
     for row in progress:
         name = row["名称"]
-        path = SAVE_DIR / f"{safe_filename(name)}.txt"
-        progress.set_postfix(当前=name, 成功=success, 跳过=skipped, 失败=len(failed))
-
-        if path.exists():
-            skipped += 1
-            continue
+        progress.set_postfix(当前=name, 成功=success, 失败=len(failed))
 
         try:
             text = parse(fetch(row["链接"]))
             if not text:
                 raise ValueError("页面中没有找到正文")
-            save_txt(row, text, path)
+            save_txt(row, text, txt_path(row))
             success += 1
         except Exception:
             failed.append(name)
@@ -134,9 +151,9 @@ def main():
         time.sleep(SLEEP_SECONDS)
 
     progress.close()
-    print(f"完成：新增 {success}，跳过已存在 {skipped}，失败 {len(failed)}，保存目录: {SAVE_DIR}")
+    print(f"完成：成功 {success}，失败 {len(failed)}，保存目录: {SAVE_DIR}")
     if failed:
-        print("失败的方剂（重新运行脚本即可重试）：", "、".join(failed))
+        print("失败的方剂（用断点续爬模式重新运行即可重试）：", "、".join(failed))
 
 
 if __name__ == "__main__":
