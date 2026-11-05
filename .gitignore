@@ -71,3 +71,5 @@ build/
 *.bak
 *.tmp
 *.sublime-workspace
+# 爬虫爬取结果（数据文件，不放进仓库）
+__001__clawler/__001__clawler_formula/formula/
