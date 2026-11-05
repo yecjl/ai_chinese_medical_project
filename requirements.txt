@@ -5,3 +5,6 @@ requests>=2.27.1
 
 # 爬虫：HTML 解析（import 名为 bs4）
 beautifulsoup4>=4.12
+
+# 爬虫：终端进度条
+tqdm>=4.70.1

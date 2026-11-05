@@ -28,6 +28,7 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+from tqdm import tqdm
 
 BASE_DIR = Path(__file__).parent
 CSV_PATH = BASE_DIR / "中药方剂.csv"
@@ -62,11 +63,10 @@ def fetch(url: str) -> str:
             response.raise_for_status()
             response.encoding = "utf-8"
             return response.text
-        except requests.RequestException as e:
+        except requests.RequestException:
             if attempt == RETRY_TIMES:
                 raise
-            print(f"    第 {attempt} 次请求失败（{e}），稍后重试...")
-            time.sleep(attempt * 2)
+            time.sleep(attempt * 2)   # 等一会儿再重试，等待时间逐次加长
 
 
 def parse(html: str) -> str:
@@ -110,13 +110,13 @@ def save_txt(row: dict, text: str, path: Path) -> None:
 def main():
     SAVE_DIR.mkdir(exist_ok=True)
     rows = read_csv(CSV_PATH)
-    total = len(rows)
-    print(f"共 {total} 个方剂，保存目录: {SAVE_DIR}")
 
     success, skipped, failed = 0, 0, []
-    for i, row in enumerate(rows, start=1):
+    progress = tqdm(rows, desc="爬取方剂", unit="个")
+    for row in progress:
         name = row["名称"]
         path = SAVE_DIR / f"{safe_filename(name)}.txt"
+        progress.set_postfix(当前=name, 成功=success, 跳过=skipped, 失败=len(failed))
 
         if path.exists():
             skipped += 1
@@ -128,14 +128,13 @@ def main():
                 raise ValueError("页面中没有找到正文")
             save_txt(row, text, path)
             success += 1
-            print(f"[{i}/{total}] {name} ✓")
-        except Exception as e:
+        except Exception:
             failed.append(name)
-            print(f"[{i}/{total}] {name} ✗ {e}")
 
         time.sleep(SLEEP_SECONDS)
 
-    print(f"\n完成：新增 {success}，跳过已存在 {skipped}，失败 {len(failed)}")
+    progress.close()
+    print(f"完成：新增 {success}，跳过已存在 {skipped}，失败 {len(failed)}，保存目录: {SAVE_DIR}")
     if failed:
         print("失败的方剂（重新运行脚本即可重试）：", "、".join(failed))
 
