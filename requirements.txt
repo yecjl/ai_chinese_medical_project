@@ -8,3 +8,24 @@ beautifulsoup4>=4.12
 
 # 爬虫：终端进度条
 tqdm>=4.70.1
+
+# 大模型：LangChain 核心组件（提示词、输出解析器等）
+langchain-core>=1.7.5
+
+# 大模型：通过 OpenAI 兼容接口调用大模型（ChatOpenAI）
+langchain-openai>=1.7.4
+
+# 大模型：LangGraph 构建工作流 / 智能体
+langgraph>=1.2.19
+
+# 数据模型：定义结构化输出的字段和类型（BaseModel、Field）
+pydantic>=2.14.2
+
+# 向量化：文本 Embedding 模型（SentenceTransformer，会自动安装 PyTorch）
+sentence-transformers>=6.2.0
+
+# 知识图谱：连接 Neo4j 图数据库
+neo4j>=6.4.1
+
+# 配置：从 .env 文件读取环境变量（import 名为 dotenv）
+python-dotenv>=1.2.4
